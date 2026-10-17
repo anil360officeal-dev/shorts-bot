@@ -90,7 +90,7 @@ def _call_anthropic(system, user):
 
 
 def _call_gemini(system, user):
-    model = os.getenv("GEMINI_MODEL") or "gemini-2.5-flash"
+    model = os.getenv("GEMINI_MODEL") or "gemini-flash-latest"
     r = requests.post(
         f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
         headers={"x-goog-api-key": os.environ["GEMINI_API_KEY"],
