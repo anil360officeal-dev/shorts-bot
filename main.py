@@ -29,7 +29,7 @@ def main():
     ap.add_argument("--slot", default="")
     ap.add_argument("--dry-run", action="store_true")
     a = ap.parse_args()
-    slot = a.slot.strip() or auto_slot()
+    slot = a.slot.strip().lower() or auto_slot()
     dry = a.dry_run or os.getenv("DRY_RUN") == "1"
     print("Slot:", slot)
 
