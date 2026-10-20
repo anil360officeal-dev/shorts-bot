@@ -90,17 +90,37 @@ def _call_anthropic(system, user):
 
 
 def _call_gemini(system, user):
-    model = os.getenv("GEMINI_MODEL") or "gemini-flash-latest"
-    r = requests.post(
-        f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
-        headers={"x-goog-api-key": os.environ["GEMINI_API_KEY"],
-                 "content-type": "application/json"},
-        json={"systemInstruction": {"parts": [{"text": system}]},
-              "contents": [{"role": "user", "parts": [{"text": user}]}],
-              "generationConfig": {"responseMimeType": "application/json"}},
-        timeout=120)
-    r.raise_for_status()
-    return r.json()["candidates"][0]["content"]["parts"][0]["text"]
+    """Gemini busy (503) ho to ruk kar dobara, phir doosre models try karta hai."""
+    import time
+    custom = os.getenv("GEMINI_MODEL")
+    models = ([custom] if custom else []) + ["gemini-flash-latest", "gemini-3-flash-preview",
+                                             "gemini-3.1-flash-lite"]
+    body = {"systemInstruction": {"parts": [{"text": system}]},
+            "contents": [{"role": "user", "parts": [{"text": user}]}],
+            "generationConfig": {"responseMimeType": "application/json"}}
+    last = None
+    for model in models:
+        for attempt in range(3):
+            try:
+                r = requests.post(
+                    f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
+                    headers={"x-goog-api-key": os.environ["GEMINI_API_KEY"],
+                             "content-type": "application/json"},
+                    json=body, timeout=90)
+                if r.status_code == 404:
+                    last = f"{model}: 404"
+                    break  # ye model nahi mila, agla try karo
+                if r.status_code in (429, 500, 502, 503, 504):
+                    last = f"{model}: {r.status_code}"
+                    time.sleep(15 * (attempt + 1))
+                    continue
+                r.raise_for_status()
+                return r.json()["candidates"][0]["content"]["parts"][0]["text"]
+            except requests.exceptions.RequestException as e:
+                last = f"{model}: {e}"
+                time.sleep(15 * (attempt + 1))
+        print("Gemini model fail:", last)
+    raise RuntimeError(f"Gemini nahi chala: {last}")
 
 
 def _call(system, user):
